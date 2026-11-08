@@ -1,0 +1,2339 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Domain A | Slit &amp; Step|Barrier-grid animation and stereography</title>
+  <meta name="description"
+    content="An interactive page about barrier-grid (scanimation) animation and stereography, featuring a line-figure walk cycle you can slide, scrub and view in 3D.">
+  <script>document.documentElement.classList.add('js');</script>
+  <style>
+    /* ==========================================================================
+   SLIT & STEP — design tokens
+   All text/background pairs verified ≥ 4.5:1 (see docs). Non-text ≥ 3:1.
+   ========================================================================== */
+    :root {
+      --paper: #f3efe6;
+      --card: #fbfaf6;
+      --ink: #121212;
+      --muted: #4a463f;
+      --rule: #d9d3c4;
+      --accent: #b42f17;
+      --on-accent: #ffffff;
+      --focus: #0b57d0;
+      --night: #0c0c10;
+      --night-2: #16161d;
+      --night-text: #ecebe6;
+      --night-muted: #b4b2aa;
+      --night-accent: #ff8a6e;
+      --night-rule: #2c2c36;
+      --fig: #c8331a;
+      --fig-far: #6b1d10;
+
+      --font-display: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+      --font-body: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+      --step--1: clamp(.82rem, .8rem + .1vw, .92rem);
+      --step-0: clamp(1rem, .96rem + .2vw, 1.15rem);
+      --step-1: clamp(1.2rem, 1.1rem + .5vw, 1.5rem);
+      --step-2: clamp(1.6rem, 1.3rem + 1.4vw, 2.4rem);
+      --step-3: clamp(2.1rem, 1.5rem + 3vw, 4rem);
+      --step-hero: clamp(2.7rem, 1.4rem + 6.6vw, 8rem);
+
+      --space-s: clamp(.75rem, .7rem + .3vw, 1rem);
+      --space-m: clamp(1.25rem, 1.1rem + .8vw, 2rem);
+      --space-l: clamp(2.5rem, 2rem + 3vw, 5rem);
+      --space-xl: clamp(4rem, 3rem + 6vw, 9rem);
+
+      --wrap: min(92vw, 1240px);
+      --ease: cubic-bezier(.2, .7, .2, 1);
+      --header-h: 72px;
+    }
+
+    @media (min-width:1920px) {
+      html {
+        font-size: 112.5%
+      }
+
+      :root {
+        --wrap: min(90vw, 1560px)
+      }
+    }
+
+    @media (min-width:2560px) {
+      html {
+        font-size: 131%
+      }
+
+      :root {
+        --wrap: min(86vw, 1960px)
+      }
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box
+    }
+
+    html {
+      scroll-padding-top: calc(var(--header-h) + 16px);
+      -webkit-text-size-adjust: 100%
+    }
+
+    html.lenis,
+    html.lenis body {
+      height: auto
+    }
+
+    .lenis.lenis-smooth {
+      scroll-behavior: auto !important
+    }
+
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font: var(--step-0)/1.6 var(--font-body);
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden
+    }
+
+    img,
+    svg,
+    canvas {
+      display: block;
+      max-width: 100%
+    }
+
+    h1,
+    h2,
+    h3 {
+      font-family: var(--font-display);
+      font-weight: 600;
+      line-height: 1.05;
+      letter-spacing: -.02em;
+      margin: 0
+    }
+
+    p {
+      margin: 0 0 1em;
+      max-width: 62ch
+    }
+
+    a {
+      color: inherit
+    }
+
+    ul {
+      margin: 0;
+      padding: 0;
+      list-style: none
+    }
+
+    .wrap {
+      width: var(--wrap);
+      margin-inline: auto
+    }
+
+    .eyebrow {
+      font: 600 var(--step--1)/1.5 var(--font-mono);
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin: 0 0 1rem
+    }
+
+    .sr-only {
+      position: absolute !important;
+      width: 1px;
+      height: 1px;
+      margin: -1px;
+      padding: 0;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+      border: 0
+    }
+
+    /* Focus — 2-colour ring survives on light and dark (WCAG 2.4.7 / 2.4.13) */
+    :focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 3px;
+      border-radius: 4px
+    }
+
+    .dark :focus-visible,
+    .site-footer :focus-visible {
+      outline-color: #ffd24a
+    }
+
+    .skip {
+      position: fixed;
+      left: 1rem;
+      top: -5rem;
+      z-index: 100;
+      background: var(--ink);
+      color: var(--paper);
+      padding: .8rem 1.1rem;
+      border-radius: 8px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: top .2s
+    }
+
+    .skip:focus {
+      top: 1rem
+    }
+
+    /* ==========================================================================
+   Loading transition — a barrier of bars that slides away (decorative, 0.9s)
+   ========================================================================== */
+    .curtain {
+      display: none
+    }
+
+    .js .curtain {
+      position: fixed;
+      inset: 0;
+      z-index: 90;
+      display: flex;
+      pointer-events: none
+    }
+
+    .curtain i {
+      flex: 1;
+      background: var(--ink);
+      transform-origin: right center;
+      animation: bar-out .7s var(--ease) both;
+      animation-delay: calc(var(--n)*45ms + .1s)
+    }
+
+    @keyframes bar-out {
+      to {
+        transform: scaleX(0)
+      }
+    }
+
+    .curtain.done {
+      display: none !important
+    }
+
+    .progress {
+      position: fixed;
+      inset: 0 0 auto 0;
+      height: 3px;
+      z-index: 60;
+      pointer-events: none
+    }
+
+    .progress span {
+      display: block;
+      height: 100%;
+      background: var(--accent);
+      transform: scaleX(0);
+      transform-origin: left
+    }
+
+    /* ==========================================================================
+   Header / navigation
+   ========================================================================== */
+    .site-header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: color-mix(in srgb, var(--paper) 88%, transparent);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid transparent;
+      transition: border-color .3s, box-shadow .3s
+    }
+
+    .site-header.is-stuck {
+      border-color: var(--rule);
+      box-shadow: 0 8px 24px -18px rgba(0, 0, 0, .4)
+    }
+
+    .bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: var(--header-h);
+      gap: 1rem;
+      position: relative
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: .65rem;
+      font: 700 1.1rem/1 var(--font-display);
+      text-decoration: none;
+      min-height: 44px
+    }
+
+    .brand svg {
+      width: 34px;
+      height: 34px
+    }
+
+    .menu-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: .6rem;
+      min-height: 44px;
+      min-width: 44px;
+      padding: 0 1rem;
+      border: 2px solid var(--ink);
+      background: transparent;
+      color: var(--ink);
+      border-radius: 999px;
+      font: 600 .95rem var(--font-body);
+      cursor: pointer;
+      transition: background .2s, color .2s, transform .15s
+    }
+
+    .menu-btn:hover {
+      background: var(--ink);
+      color: var(--paper)
+    }
+
+    .menu-btn:active {
+      transform: scale(.96)
+    }
+
+    .menu-btn .bars {
+      display: grid;
+      gap: 4px;
+      width: 18px
+    }
+
+    .menu-btn .bars i {
+      display: block;
+      height: 2px;
+      background: currentColor;
+      transition: transform .3s var(--ease), opacity .2s
+    }
+
+    .menu-btn[aria-expanded="true"] .bars i:nth-child(1) {
+      transform: translateY(6px) rotate(45deg)
+    }
+
+    .menu-btn[aria-expanded="true"] .bars i:nth-child(2) {
+      opacity: 0
+    }
+
+    .menu-btn[aria-expanded="true"] .bars i:nth-child(3) {
+      transform: translateY(-6px) rotate(-45deg)
+    }
+
+    .nav {
+      position: absolute;
+      top: calc(100% + 6px);
+      right: 0;
+      left: 0;
+      background: var(--card);
+      border: 1px solid var(--rule);
+      border-radius: 16px;
+      padding: .5rem;
+      box-shadow: 0 24px 48px -24px rgba(0, 0, 0, .45);
+      display: none
+    }
+
+    .nav.open {
+      display: block;
+      animation: drop .3s var(--ease)
+    }
+
+    @keyframes drop {
+      from {
+        opacity: 0;
+        transform: translateY(-8px)
+      }
+    }
+
+    .nav a {
+      display: flex;
+      align-items: center;
+      min-height: 48px;
+      padding: 0 1rem;
+      border-radius: 10px;
+      text-decoration: none;
+      font-weight: 600;
+      position: relative
+    }
+
+    .nav a:hover {
+      background: var(--paper)
+    }
+
+    .nav a[aria-current="true"] {
+      background: var(--ink);
+      color: var(--paper)
+    }
+
+    @media (min-width:860px) {
+      .menu-btn {
+        display: none
+      }
+
+      .nav {
+        position: static;
+        display: block;
+        background: none;
+        border: 0;
+        box-shadow: none;
+        padding: 0
+      }
+
+      .nav ul {
+        display: flex;
+        gap: .25rem
+      }
+
+      .nav a {
+        padding: 0 .95rem;
+        border-radius: 999px
+      }
+
+      .nav a:not([aria-current="true"])::after {
+        content: "";
+        position: absolute;
+        left: .95rem;
+        right: .95rem;
+        bottom: 8px;
+        height: 2px;
+        background: currentColor;
+        transform: scaleX(0);
+        transform-origin: left;
+        transition: transform .3s var(--ease)
+      }
+
+      .nav a:not([aria-current="true"]):hover::after {
+        transform: scaleX(1)
+      }
+
+      .nav a:hover {
+        background: transparent
+      }
+
+      .nav a[aria-current="true"]:hover {
+        background: var(--ink)
+      }
+    }
+
+    /* ==========================================================================
+   Buttons
+   ========================================================================== */
+    .btn {
+      --bg: var(--ink);
+      --fg: var(--paper);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: .6rem;
+      min-height: 48px;
+      padding: 0 1.5rem;
+      border-radius: 999px;
+      border: 2px solid var(--ink);
+      background: var(--bg);
+      color: var(--fg);
+      font: 600 1rem var(--font-body);
+      text-decoration: none;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      isolation: isolate;
+      transition: transform .15s var(--ease), color .25s
+    }
+
+    .btn::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: var(--accent);
+      transform: translateY(101%);
+      transition: transform .35s var(--ease);
+      z-index: -1
+    }
+
+    .btn:hover::before,
+    .btn:focus-visible::before {
+      transform: none
+    }
+
+    .btn:hover {
+      color: var(--on-accent);
+      border-color: var(--accent)
+    }
+
+    .btn:active {
+      transform: scale(.96)
+    }
+
+    .btn--ghost {
+      --bg: transparent;
+      --fg: var(--ink)
+    }
+
+    .btn--ghost:hover {
+      color: var(--on-accent)
+    }
+
+    .btn[aria-pressed="true"] {
+      --bg: var(--ink);
+      --fg: var(--paper)
+    }
+
+    .dark .btn {
+      --bg: var(--night-text);
+      --fg: var(--night);
+      border-color: var(--night-text)
+    }
+
+    .dark .btn--ghost {
+      --bg: transparent;
+      --fg: var(--night-text)
+    }
+
+    .dark .btn::before {
+      background: var(--night-accent)
+    }
+
+    .dark .btn:hover {
+      color: var(--night);
+      border-color: var(--night-accent)
+    }
+
+    .btn svg {
+      width: 18px;
+      height: 18px;
+      flex: none
+    }
+
+    /* ==========================================================================
+   Reveal (progressive enhancement; content visible without JS)
+   ========================================================================== */
+    .js [data-reveal] {
+      opacity: 0;
+      transform: translateY(28px);
+      transition: opacity .8s var(--ease), transform .8s var(--ease);
+      transition-delay: calc(var(--i, 0)*90ms)
+    }
+
+    .js [data-reveal].in {
+      opacity: 1;
+      transform: none
+    }
+
+    /* ==========================================================================
+   Hero
+   ========================================================================== */
+    .hero {
+      position: relative;
+      padding-block: var(--space-l) var(--space-xl);
+      overflow: clip
+    }
+
+    .hero__bg {
+      position: absolute;
+      inset: -10% 0 auto 0;
+      height: 120%;
+      z-index: -1;
+      pointer-events: none;
+      background: repeating-linear-gradient(90deg, transparent 0 22px, rgba(18, 18, 18, .06) 22px 24px);
+      mask-image: linear-gradient(#000 40%, transparent);
+      -webkit-mask-image: linear-gradient(#000 40%, transparent);
+      transform: translate3d(0, var(--py, 0px), 0)
+    }
+
+    .hero__grid {
+      display: grid;
+      gap: var(--space-l);
+      align-items: center
+    }
+
+    @media (min-width:980px) {
+      .hero__grid {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr)
+      }
+    }
+
+    .hero h1 {
+      font-size: var(--step-hero)
+    }
+
+    .hero h1 em {
+      font-style: italic;
+      color: var(--accent)
+    }
+
+    .hero .lede {
+      font-size: var(--step-1);
+      color: var(--muted);
+      margin-top: var(--space-m);
+      max-width: 34ch
+    }
+
+    .cta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .75rem;
+      margin-top: var(--space-m)
+    }
+
+    .stats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.5rem 2.5rem;
+      margin-top: var(--space-l);
+      font-family: var(--font-mono);
+      font-size: var(--step--1);
+      color: var(--muted)
+    }
+
+    .stats b {
+      display: block;
+      font: 600 var(--step-2)/1 var(--font-display);
+      color: var(--ink)
+    }
+
+    /* ---- Scanimation device ---- */
+    .device {
+      position: relative
+    }
+
+    .device__frame {
+      background: var(--card);
+      border: 2px solid var(--ink);
+      border-radius: 20px;
+      padding: clamp(.6rem, 1.5vw, 1.1rem);
+      box-shadow: 10px 10px 0 var(--ink)
+    }
+
+    .scan {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 3/2;
+      overflow: hidden;
+      border-radius: 10px;
+      background: #fbfaf6;
+      touch-action: pan-y;
+      cursor: ew-resize;
+      user-select: none;
+      -webkit-user-select: none
+    }
+
+    .scan__stage {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 600px;
+      height: 400px;
+      transform-origin: 0 0;
+      transform: scale(var(--s, 1))
+    }
+
+    .scan canvas {
+      position: absolute;
+      inset: 0;
+      width: 600px;
+      height: 400px
+    }
+
+    .barrier {
+      position: absolute;
+      top: 0;
+      left: -18px;
+      width: 648px;
+      height: 100%;
+      background: repeating-linear-gradient(90deg, transparent 0 3px, #0d0d0d 3px 18px);
+      will-change: transform;
+      transition: opacity .35s
+    }
+
+    .scan[data-barrier="off"] .barrier {
+      opacity: 0
+    }
+
+    .controls {
+      display: grid;
+      gap: 1rem;
+      margin-top: 1.25rem
+    }
+
+    .controls__row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .75rem;
+      align-items: center
+    }
+
+    .field-range {
+      display: grid;
+      gap: .35rem;
+      flex: 1 1 220px
+    }
+
+    .field-range label {
+      font: 600 var(--step--1) var(--font-mono);
+      letter-spacing: .05em
+    }
+
+    .field-range output {
+      font-weight: 400;
+      color: var(--muted)
+    }
+
+    .dark .field-range output {
+      color: var(--night-muted)
+    }
+
+    input[type=range] {
+      width: 100%;
+      height: 44px;
+      background: transparent;
+      accent-color: var(--accent);
+      cursor: pointer;
+      margin: 0
+    }
+
+    .dark input[type=range] {
+      accent-color: var(--night-accent)
+    }
+
+    .hint {
+      font-size: var(--step--1);
+      color: var(--muted);
+      margin: 0
+    }
+
+    .dark .hint {
+      color: var(--night-muted)
+    }
+
+    .badge {
+      position: absolute;
+      right: -.5rem;
+      top: -1rem;
+      transform: rotate(4deg);
+      background: var(--accent);
+      color: var(--on-accent);
+      font: 700 var(--step--1) var(--font-mono);
+      padding: .45rem .8rem;
+      border-radius: 6px;
+      letter-spacing: .06em
+    }
+
+    /* ==========================================================================
+   Marquee (pausable — WCAG 2.2.2)
+   ========================================================================== */
+    .marquee {
+      border-block: 2px solid var(--ink);
+      background: var(--ink);
+      color: var(--paper);
+      display: flex;
+      align-items: center
+    }
+
+    .marquee__viewport {
+      overflow: hidden;
+      flex: 1;
+      min-width: 0
+    }
+
+    .marquee__track {
+      display: flex;
+      width: max-content;
+      animation: marq 38s linear infinite
+    }
+
+    .marquee.paused .marquee__track,
+    .marquee__viewport:hover .marquee__track,
+    .marquee__viewport:focus-within .marquee__track {
+      animation-play-state: paused
+    }
+
+    .marquee ul {
+      display: flex;
+      flex: none
+    }
+
+    .marquee li {
+      font: italic 600 var(--step-2)/1 var(--font-display);
+      padding: 1rem 1.6rem;
+      white-space: nowrap
+    }
+
+    .marquee li::after {
+      content: "▮▯▮";
+      margin-left: 3.2rem;
+      font-style: normal;
+      font-size: .6em;
+      letter-spacing: .2em;
+      color: #ff8a6e;
+      vertical-align: middle
+    }
+
+    @keyframes marq {
+      to {
+        transform: translateX(-50%)
+      }
+    }
+
+    .marquee button {
+      flex: none;
+      margin: 0 1rem;
+      min-height: 44px;
+      min-width: 44px;
+      padding: 0 1rem;
+      border-radius: 999px;
+      border: 2px solid var(--paper);
+      background: transparent;
+      color: var(--paper);
+      font: 600 .9rem var(--font-body);
+      cursor: pointer
+    }
+
+    .marquee button:hover {
+      background: var(--paper);
+      color: var(--ink)
+    }
+
+    .marquee :focus-visible {
+      outline-color: #ffd24a
+    }
+
+    /* ==========================================================================
+   Sections
+   ========================================================================== */
+    .section {
+      padding-block: var(--space-xl)
+    }
+
+    .section__head {
+      display: grid;
+      gap: 1rem;
+      margin-bottom: var(--space-l)
+    }
+
+    .section__head h2 {
+      font-size: var(--step-3);
+      max-width: 18ch
+    }
+
+    .section__head p {
+      font-size: var(--step-1);
+      color: var(--muted)
+    }
+
+    .dark .section__head p {
+      color: var(--night-muted)
+    }
+
+    .dark {
+      background: var(--night);
+      color: var(--night-text)
+    }
+
+    .dark .eyebrow {
+      color: var(--night-accent)
+    }
+
+    /* Anatomy: 3 steps with layout variety */
+    .steps {
+      display: grid;
+      gap: 1.25rem;
+      counter-reset: s
+    }
+
+    @media (min-width:800px) {
+      .steps {
+        grid-template-columns: repeat(12, 1fr)
+      }
+
+      .step:nth-child(1) {
+        grid-column: span 5
+      }
+
+      .step:nth-child(2) {
+        grid-column: span 7
+      }
+
+      .step:nth-child(3) {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: 5fr 7fr;
+        gap: 1.5rem;
+        align-items: center
+      }
+    }
+
+    .card {
+      position: relative;
+      background: var(--card);
+      border: 1px solid var(--rule);
+      border-radius: 20px;
+      padding: var(--space-m);
+      overflow: hidden;
+      isolation: isolate;
+      transition: transform .35s var(--ease), box-shadow .35s var(--ease), border-color .25s
+    }
+
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      opacity: 0;
+      transition: opacity .3s;
+      background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), rgba(180, 47, 23, .12), transparent 60%)
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+      border-color: var(--ink);
+      box-shadow: 0 24px 40px -28px rgba(0, 0, 0, .5)
+    }
+
+    .card:hover::before {
+      opacity: 1
+    }
+
+    .dark .card {
+      background: var(--night-2);
+      border-color: var(--night-rule)
+    }
+
+    .dark .card:hover {
+      border-color: var(--night-text)
+    }
+
+    .dark .card::before {
+      background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), rgba(255, 138, 110, .14), transparent 60%)
+    }
+
+    .step h3,
+    .tile h3 {
+      font-size: var(--step-1);
+      margin: 0 0 .6rem
+    }
+
+    .step h3::before {
+      counter-increment: s;
+      content: "0" counter(s);
+      display: block;
+      font: 600 var(--step--1) var(--font-mono);
+      color: var(--accent);
+      margin-bottom: .8rem;
+      letter-spacing: .1em
+    }
+
+    .step p {
+      color: var(--muted);
+      margin: 0
+    }
+
+    .frames {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 6px;
+      margin-top: 1.2rem
+    }
+
+    .frames canvas {
+      width: 100%;
+      height: auto;
+      aspect-ratio: 3/4;
+      border: 1px solid var(--rule);
+      border-radius: 6px;
+      background: #fbfaf6
+    }
+
+    .plate-demo {
+      border-radius: 10px;
+      border: 1px solid var(--rule);
+      overflow: hidden
+    }
+
+    .plate-demo canvas {
+      width: 100%;
+      height: auto;
+      aspect-ratio: 3/1
+    }
+
+    .slitdiag {
+      height: 70px;
+      margin-top: 1.2rem;
+      border-radius: 8px;
+      border: 1px solid var(--rule);
+      background: repeating-linear-gradient(90deg, transparent 0 6px, var(--ink) 6px 36px);
+      position: relative;
+      overflow: hidden
+    }
+
+    .slitdiag::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(90deg, rgba(200, 51, 26, .5) 0 6px, transparent 6px 36px);
+      animation: slide 3s steps(6) infinite
+    }
+
+    @keyframes slide {
+      to {
+        transform: translateX(36px)
+      }
+    }
+
+    /* Stereography */
+    .stereo-grid {
+      display: grid;
+      gap: var(--space-m)
+    }
+
+    @media (min-width:1000px) {
+      .stereo-grid {
+        grid-template-columns: minmax(0, 2.2fr) minmax(280px, 1fr);
+        align-items: start
+      }
+    }
+
+    .viewer {
+      position: relative;
+      border-radius: 20px;
+      overflow: hidden;
+      background: #000;
+      border: 1px solid var(--night-rule)
+    }
+
+    .viewer canvas {
+      width: 100%;
+      aspect-ratio: 4/3;
+      touch-action: pan-y;
+      cursor: grab
+    }
+
+    @media (min-width:700px) {
+      .viewer canvas {
+        aspect-ratio: 16/9
+      }
+    }
+
+    .viewer canvas:active {
+      cursor: grabbing
+    }
+
+    .panel {
+      display: grid;
+      gap: 1.25rem;
+      background: var(--night-2);
+      border: 1px solid var(--night-rule);
+      border-radius: 20px;
+      padding: var(--space-m)
+    }
+
+    fieldset {
+      border: 0;
+      margin: 0;
+      padding: 0;
+      min-width: 0
+    }
+
+    legend {
+      font: 600 var(--step--1) var(--font-mono);
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--night-muted);
+      padding: 0;
+      margin-bottom: .6rem
+    }
+
+    .seg {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4px;
+      background: var(--night);
+      border: 1px solid var(--night-rule);
+      border-radius: 14px;
+      padding: 4px
+    }
+
+    .seg input {
+      position: absolute;
+      opacity: 0;
+      width: 1px;
+      height: 1px
+    }
+
+    .seg label {
+      display: grid;
+      place-items: center;
+      text-align: center;
+      min-height: 48px;
+      padding: .3rem;
+      border-radius: 10px;
+      cursor: pointer;
+      font: 600 .9rem/1.2 var(--font-body);
+      transition: background .25s, color .25s;
+      color: var(--night-text)
+    }
+
+    .seg label:hover {
+      background: var(--night-rule)
+    }
+
+    .seg input:checked+label {
+      background: var(--night-text);
+      color: var(--night)
+    }
+
+    .seg input:focus-visible+label {
+      outline: 3px solid #ffd24a;
+      outline-offset: 2px
+    }
+
+    .glasses {
+      display: flex;
+      gap: .6rem;
+      align-items: center;
+      font-size: var(--step--1);
+      color: var(--night-muted)
+    }
+
+    .glasses i {
+      display: inline-block;
+      width: 26px;
+      height: 14px;
+      border-radius: 7px 7px 10px 10px;
+      background: linear-gradient(90deg, #ff2a2a 0 50%, #00ffff 50%);
+      border: 2px solid var(--night-text)
+    }
+
+    /* Motion system tiles */
+    .tiles {
+      display: grid;
+      gap: 1.25rem;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr))
+    }
+
+    .tile p {
+      color: var(--muted);
+      margin: 0 0 1rem;
+      font-size: .98rem
+    }
+
+    .tile dl {
+      margin: 0;
+      display: grid;
+      gap: .3rem;
+      font-size: var(--step--1)
+    }
+
+    .tile dt {
+      font: 600 .74rem var(--font-mono);
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--accent)
+    }
+
+    .tile dd {
+      margin: 0 0 .5rem;
+      color: var(--muted)
+    }
+
+    .tile .demo {
+      display: grid;
+      place-items: center;
+      min-height: 96px;
+      border-radius: 12px;
+      background: var(--paper);
+      margin-bottom: 1rem;
+      border: 1px dashed var(--rule)
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      min-height: 44px;
+      padding: 0 1.2rem;
+      border-radius: 999px;
+      border: 2px solid var(--ink);
+      font-weight: 600;
+      background: transparent;
+      color: var(--ink);
+      cursor: pointer;
+      font-family: inherit;
+      font-size: .95rem;
+      transition: transform .2s var(--ease), background .2s, color .2s
+    }
+
+    .chip:hover {
+      background: var(--ink);
+      color: var(--paper);
+      transform: translateY(-2px)
+    }
+
+    .chip:active {
+      transform: scale(.94)
+    }
+
+    .mini-bars {
+      display: flex;
+      gap: 4px;
+      height: 48px;
+      align-items: end
+    }
+
+    .mini-bars i {
+      width: 8px;
+      background: var(--ink);
+      height: 100%;
+      transform-origin: bottom;
+      transform: scaleY(.25);
+      transition: transform .5s var(--ease);
+      transition-delay: calc(var(--k)*50ms)
+    }
+
+    .tile:hover .mini-bars i,
+    .tile:focus-within .mini-bars i {
+      transform: scaleY(1)
+    }
+
+    .spin-demo {
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      border: 5px solid var(--rule);
+      border-top-color: var(--accent);
+      animation: spin 1s linear infinite
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(1turn)
+      }
+    }
+
+    .tick {
+      font-size: 1.6rem;
+      transition: transform .35s var(--ease)
+    }
+
+    .check-demo[aria-pressed="true"] .tick {
+      transform: scale(1.35) rotate(-8deg)
+    }
+
+    /* Form */
+    .contact {
+      display: grid;
+      gap: var(--space-l)
+    }
+
+    @media (min-width:900px) {
+      .contact {
+        grid-template-columns: 1fr 1.1fr;
+        align-items: start
+      }
+    }
+
+    .form {
+      background: var(--card);
+      border: 2px solid var(--ink);
+      border-radius: 20px;
+      padding: var(--space-m);
+      display: grid;
+      gap: 1.25rem;
+      box-shadow: 10px 10px 0 var(--ink)
+    }
+
+    .field {
+      display: grid;
+      gap: .4rem
+    }
+
+    .field label,
+    .field .lbl {
+      font-weight: 600
+    }
+
+    .req {
+      color: var(--accent);
+      margin-left: .15em
+    }
+
+    .field input,
+    .field select,
+    .field textarea {
+      width: 100%;
+      min-height: 48px;
+      padding: .7rem .9rem;
+      border-radius: 10px;
+      border: 2px solid #6d675b;
+      background: #fff;
+      color: var(--ink);
+      font: inherit;
+      transition: border-color .2s, box-shadow .2s
+    }
+
+    .field textarea {
+      min-height: 110px;
+      resize: vertical
+    }
+
+    .field input:hover,
+    .field select:hover,
+    .field textarea:hover {
+      border-color: var(--ink)
+    }
+
+    .field input:focus-visible,
+    .field select:focus-visible,
+    .field textarea:focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 2px;
+      border-color: var(--ink)
+    }
+
+    .field [aria-invalid="true"] {
+      border-color: #a4160d;
+      background: #fff6f5
+    }
+
+    .field .help {
+      font-size: var(--step--1);
+      color: var(--muted)
+    }
+
+    .field .err {
+      display: none;
+      font-size: var(--step--1);
+      font-weight: 600;
+      color: #a4160d
+    }
+
+    .field .err.show {
+      display: flex;
+      gap: .4rem;
+      align-items: flex-start;
+      animation: shake .4s
+    }
+
+    @keyframes shake {
+      25% {
+        transform: translateX(-4px)
+      }
+
+      75% {
+        transform: translateX(4px)
+      }
+    }
+
+    .valid-mark {
+      display: none
+    }
+
+    .summary {
+      display: none;
+      border: 2px solid #a4160d;
+      background: #fff6f5;
+      color: #6d0b05;
+      border-radius: 12px;
+      padding: 1rem
+    }
+
+    .summary.show {
+      display: block
+    }
+
+    .summary h3 {
+      font: 700 1rem var(--font-body);
+      margin-bottom: .4rem
+    }
+
+    .summary a {
+      font-weight: 600
+    }
+
+    .status {
+      display: none;
+      border: 2px solid #14632b;
+      background: #effaf1;
+      color: #0b3a19;
+      border-radius: 12px;
+      padding: 1rem;
+      font-weight: 600
+    }
+
+    .status.show {
+      display: block;
+      animation: drop .4s var(--ease)
+    }
+
+    .form .btn.loading {
+      pointer-events: none;
+      opacity: .8
+    }
+
+    .form .btn.loading::after {
+      content: "";
+      width: 16px;
+      height: 16px;
+      border: 2px solid currentColor;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin .7s linear infinite
+    }
+
+    /* Footer */
+    .site-footer {
+      background: var(--night);
+      color: var(--night-text);
+      padding-top: var(--space-xl);
+      overflow: hidden
+    }
+
+    .site-footer h2 {
+      font-size: var(--step-hero);
+      max-width: 12ch
+    }
+
+    .site-footer h2 em {
+      color: var(--night-accent)
+    }
+
+    .foot-grid {
+      display: grid;
+      gap: var(--space-m);
+      margin-top: var(--space-l);
+      padding-bottom: var(--space-l)
+    }
+
+    @media (min-width:800px) {
+      .foot-grid {
+        grid-template-columns: 2fr 1fr 1fr
+      }
+    }
+
+    .foot-grid h3 {
+      font: 600 var(--step--1) var(--font-mono);
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--night-muted);
+      margin-bottom: .8rem
+    }
+
+    .foot-grid a {
+      display: inline-flex;
+      align-items: center;
+      min-height: 44px;
+      text-decoration: none;
+      background: linear-gradient(currentColor, currentColor) left bottom/0 2px no-repeat;
+      transition: background-size .3s var(--ease)
+    }
+
+    .foot-grid a:hover {
+      background-size: 100% 2px
+    }
+
+    .foot-grid p {
+      color: var(--night-muted);
+      font-size: .95rem
+    }
+
+    .foot-bars {
+      height: 56px;
+      background: repeating-linear-gradient(90deg, transparent 0 6px, var(--night-text) 6px 36px);
+      position: relative
+    }
+
+    .foot-bars::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(90deg, var(--night-accent) 0 6px, transparent 6px 36px);
+      animation: slide 6s steps(6) infinite;
+      opacity: .9;
+      mix-blend-mode: multiply
+    }
+
+    .legal {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      justify-content: space-between;
+      align-items: center;
+      padding-block: 1.2rem;
+      font-size: .88rem;
+      color: var(--night-muted)
+    }
+
+    /* ==========================================================================
+   Reduced motion — static alternatives; nothing essential hidden (WCAG 2.3.3)
+   ========================================================================== */
+    @media (prefers-reduced-motion:reduce) {
+
+      *,
+      *::before,
+      *::after {
+        animation-duration: .001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .001ms !important;
+        transition-delay: 0s !important;
+        scroll-behavior: auto !important
+      }
+
+      .js [data-reveal] {
+        opacity: 1;
+        transform: none
+      }
+
+      .js .curtain {
+        display: none
+      }
+
+      .marquee__viewport {
+        overflow-x: auto
+      }
+
+      .marquee__track {
+        width: auto;
+        flex-wrap: wrap
+      }
+
+      .marquee ul[aria-hidden="true"] {
+        display: none
+      }
+
+      .hero__bg {
+        transform: none
+      }
+
+      .card:hover {
+        transform: none
+      }
+    }
+
+    @media (forced-colors:active) {
+
+      .btn,
+      .chip,
+      .menu-btn {
+        border: 2px solid ButtonText
+      }
+
+      .barrier {
+        background: repeating-linear-gradient(90deg, transparent 0 3px, CanvasText 3px 18px)
+      }
+    }
+  </style>
+</head>
+
+<body id="top">
+  <a class="skip" href="#main">Skip to main content</a>
+
+  <div class="curtain" aria-hidden="true" id="curtain"></div>
+  <div class="progress" aria-hidden="true"><span id="progress"></span></div>
+
+  <header class="site-header" id="header">
+    <div class="wrap bar">
+      <a class="brand" href="#top" aria-label="Slit and Step — back to top">
+        <svg viewBox="0 0 34 34" aria-hidden="true" focusable="false">
+          <rect width="34" height="34" rx="9" fill="#121212" />
+          <g stroke="#f3efe6" stroke-width="2.4">
+            <path d="M7 5v24M13 5v24M19 5v24M25 5v24" opacity=".55" />
+          </g>
+          <g stroke="#ff8a6e" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none">
+            <circle cx="17" cy="9" r="2.2" />
+            <path d="M17 12v7l-4 7M17 19l4 7M17 14l-4 4M17 14l4 4" />
+          </g>
+        </svg>
+        <span>Slit &amp; Step</span>
+      </a>
+      <button class="menu-btn" id="menuBtn" type="button" aria-expanded="false" aria-controls="nav">
+        <span class="bars" aria-hidden="true"><i></i><i></i><i></i></span><span>Menu</span>
+      </button>
+      <nav class="nav" id="nav" aria-label="Primary">
+        <ul>
+          <li><a href="#barrier">Barrier-grid</a></li>
+          <li><a href="#stereo">Stereography</a></li>
+          <li><a href="#system">Motion system</a></li>
+          <li><a href="#contact">Get the kit</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main" tabindex="-1">
+
+    <!-- ============================ HERO ============================ -->
+    <section class="hero" aria-labelledby="hero-title" data-section="hero">
+      <div class="hero__bg" id="heroBg" aria-hidden="true"></div>
+      <div class="wrap hero__grid">
+        <div>
+          <p class="eyebrow" data-reveal>Barrier-grid animation · Stereography</p>
+          <h1 id="hero-title" data-reveal style="--i:1">It walks <em>between</em> the bars.</h1>
+          <p class="lede" data-reveal style="--i:2">A striped mask slides over six hidden poses of a line figure.
+            Nothing moves except the mask — yet the figure walks.</p>
+          <div class="cta" data-reveal style="--i:3">
+            <a class="btn" href="#scan-controls">Slide the barrier</a>
+            <a class="btn btn--ghost" href="#stereo">See it in 3D
+              <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                <path d="M4 10h11M11 5l5 5-5 5" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </a>
+          </div>
+          <dl class="stats" data-reveal style="--i:4">
+            <div>
+              <dt class="sr-only">Frames hidden in the plate</dt><b>6</b>
+              <dd style="margin:0">frames, interlaced</dd>
+            </div>
+            <div>
+              <dt class="sr-only">Slit width</dt><b>1⁄6</b>
+              <dd style="margin:0">of the image shows</dd>
+            </div>
+            <div>
+              <dt class="sr-only">Moving parts</dt><b>1</b>
+              <dd style="margin:0">moving part: the mask</dd>
+            </div>
+          </dl>
+        </div>
+
+        <div class="device" data-reveal style="--i:2">
+          <span class="badge" aria-hidden="true">LIVE · NO VIDEO</span>
+          <div class="device__frame">
+            <div class="scan" id="scan" data-barrier="on" role="img"
+              aria-label="Animated line figure walking. It is produced by a striped barrier sliding over an interlaced image of six poses. Use the controls below to play, pause or scrub.">
+              <div class="scan__stage" id="stage">
+                <canvas id="plate" width="1200" height="800"></canvas>
+                <div class="barrier" id="barrier"></div>
+              </div>
+            </div>
+          </div>
+          <div class="controls" id="scan-controls" role="group" aria-label="Barrier-grid controls">
+            <div class="controls__row">
+              <button class="btn" id="playBtn" type="button" aria-label="Pause walking animation">Pause</button>
+              <button class="btn btn--ghost" id="barrierBtn" type="button" aria-pressed="true">Barrier mask</button>
+            </div>
+            <div class="controls__row">
+              <div class="field-range">
+                <label for="phase">Barrier position <output id="phaseOut" for="phase">frame 1 of 6</output></label>
+                <input id="phase" type="range" min="0" max="100" step="1" value="0">
+              </div>
+              <div class="field-range">
+                <label for="speed">Speed <output id="speedOut" for="speed">0.8 strides/s</output></label>
+                <input id="speed" type="range" min="0.2" max="2" step="0.1" value="0.8">
+              </div>
+            </div>
+            <p class="hint">Tip: drag sideways across the picture. Turn the barrier mask off to see the raw interlaced
+              plate.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ MARQUEE ============================ -->
+    <section class="marquee" id="marquee" aria-label="Key ideas">
+      <div class="marquee__viewport">
+        <div class="marquee__track">
+          <ul>
+            <li>Interlace</li>
+            <li>Mask</li>
+            <li>Slide</li>
+            <li>Parallax</li>
+            <li>Left eye · Right eye</li>
+            <li>Persistence of vision</li>
+          </ul>
+          <ul aria-hidden="true">
+            <li>Interlace</li>
+            <li>Mask</li>
+            <li>Slide</li>
+            <li>Parallax</li>
+            <li>Left eye · Right eye</li>
+            <li>Persistence of vision</li>
+          </ul>
+        </div>
+      </div>
+      <button type="button" id="marqBtn">Pause</button>
+    </section>
+
+    <!-- ============================ BARRIER-GRID ============================ -->
+    <section class="section" id="barrier" aria-labelledby="barrier-title" data-section="barrier">
+      <div class="wrap">
+        <header class="section__head">
+          <p class="eyebrow" data-reveal>How barrier-grid animation works</p>
+          <h2 id="barrier-title" data-reveal style="--i:1">Three layers, one trick.</h2>
+          <p data-reveal style="--i:2">Each pose is cut into thin vertical strips and woven together. A mask with narrow
+            slits lets you see only one pose at a time — slide it, and the poses play in order.</p>
+        </header>
+
+        <ol class="steps" style="list-style:none;padding:0;margin:0">
+          <li class="card step" data-reveal data-spot>
+            <h3>Draw the poses</h3>
+            <p>A full walk cycle is split into six key poses. Legs swap, arms counter-swing, the ground slides a sixth
+              of its tick spacing each time.</p>
+            <div class="frames" id="frames" aria-hidden="true"></div>
+          </li>
+          <li class="card step" data-reveal data-spot style="--i:1">
+            <h3>Interlace the strips</h3>
+            <p>Column 1 comes from pose 1, column 2 from pose 2, and so on, repeating every six columns. On its own, the
+              result looks like a stripy smear.</p>
+            <div class="plate-demo" style="margin-top:1.2rem"><canvas id="platePeek" width="900" height="300"
+                aria-hidden="true"></canvas></div>
+          </li>
+          <li class="card step" data-reveal data-spot style="--i:2">
+            <div>
+              <h3>Slide the mask</h3>
+              <p>The mask is opaque for five strips and open for one. Shifting it by a single strip reveals the next
+                pose — a full period of movement is one complete stride.</p>
+            </div>
+            <div class="slitdiag" aria-hidden="true"></div>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ============================ STEREOGRAPHY ============================ -->
+    <section class="section dark" id="stereo" aria-labelledby="stereo-title" data-section="stereo">
+      <div class="wrap">
+        <header class="section__head">
+          <p class="eyebrow" data-reveal>Stereography</p>
+          <h2 id="stereo-title" data-reveal style="--i:1">The same walker, in depth.</h2>
+          <p data-reveal style="--i:2">A 3D wireframe skeleton is drawn twice, from two eyes a few centimetres apart.
+            Your brain fuses the small differences into depth. Drag the picture to orbit it.</p>
+        </header>
+
+        <div class="stereo-grid">
+          <div class="viewer" data-reveal>
+            <canvas id="stereoCanvas" width="960" height="540" role="img" aria-describedby="stereoDesc"
+              aria-label="Stereoscopic wireframe of a walking figure"></canvas>
+          </div>
+
+          <form class="panel" data-reveal style="--i:1" onsubmit="return false" aria-label="Stereography controls">
+            <fieldset>
+              <legend>View mode</legend>
+              <div class="seg">
+                <input type="radio" name="mode" id="m-ana" value="anaglyph" checked><label for="m-ana">Red /
+                  cyan<br>anaglyph</label>
+                <input type="radio" name="mode" id="m-sbs" value="sbs"><label for="m-sbs">Side-by-side pair</label>
+                <input type="radio" name="mode" id="m-mono" value="mono"><label for="m-mono">Single view</label>
+              </div>
+            </fieldset>
+            <p class="glasses" id="stereoDesc"><i aria-hidden="true"></i><span id="modeHelp">Wear red/cyan glasses (red
+                lens over the left eye). Without them, use “Single view”.</span></p>
+
+            <div class="field-range">
+              <label for="sep">Depth <output id="sepOut" for="sep">0.40</output></label>
+              <input id="sep" type="range" min="0" max="0.7" step="0.01" value="0.4">
+            </div>
+            <div class="field-range">
+              <label for="conv">Focus plane <output id="convOut" for="conv">0.0 m</output></label>
+              <input id="conv" type="range" min="-1.5" max="1.5" step="0.1" value="0">
+            </div>
+            <div class="field-range">
+              <label for="yaw">Orbit angle <output id="yawOut" for="yaw">35°</output></label>
+              <input id="yaw" type="range" min="-90" max="90" step="1" value="35">
+            </div>
+            <div class="field-range">
+              <label for="stride">Stride <output id="strideOut" for="stride">0%</output></label>
+              <input id="stride" type="range" min="0" max="100" step="1" value="0">
+            </div>
+            <button class="btn" id="walkBtn" type="button">Pause walk</button>
+            <p class="hint">Side-by-side: relax your eyes to look through the screen (parallel view) until the pair
+              merges into three.</p>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ MOTION SYSTEM ============================ -->
+    <section class="section" id="system" aria-labelledby="system-title" data-section="system">
+      <div class="wrap">
+        <header class="section__head">
+          <p class="eyebrow" data-reveal>Motion system</p>
+          <h2 id="system-title" data-reveal style="--i:1">Motion that explains, never decorates.</h2>
+          <p data-reveal style="--i:2">Every effect on this page serves a purpose and has a reduced-motion alternative.
+          </p>
+        </header>
+
+        <div class="tiles">
+          <article class="card tile" data-reveal data-spot>
+            <div class="demo"><button type="button" class="chip">Hover or focus me</button></div>
+            <h3>Hover</h3>
+            <p>Links draw an underline, buttons fill from below, cards follow the pointer with a soft spotlight.</p>
+            <dl>
+              <dt>Purpose</dt>
+              <dd>Signals what is interactive.</dd>
+              <dt>Reduced motion</dt>
+              <dd>Colour change only.</dd>
+            </dl>
+          </article>
+          <article class="card tile" data-reveal data-spot style="--i:1">
+            <div class="demo">
+              <div class="mini-bars" aria-hidden="true"><i style="--k:0"></i><i style="--k:1"></i><i
+                  style="--k:2"></i><i style="--k:3"></i><i style="--k:4"></i><i style="--k:5"></i></div>
+            </div>
+            <h3>Reveal</h3>
+            <p>Sections rise and fade in with a 90&nbsp;ms stagger as they enter the viewport.</p>
+            <dl>
+              <dt>Purpose</dt>
+              <dd>Sets reading order.</dd>
+              <dt>Reduced motion</dt>
+              <dd>Content is shown immediately.</dd>
+            </dl>
+          </article>
+          <article class="card tile" data-reveal data-spot style="--i:2">
+            <div class="demo"><span aria-hidden="true" style="font:600 1.6rem var(--font-mono)">↓ 100%</span></div>
+            <h3>Scroll</h3>
+            <p>Lenis smooths the wheel, a progress bar shows position, and the hero stripes drift slowly.</p>
+            <dl>
+              <dt>Purpose</dt>
+              <dd>Orientation and continuity.</dd>
+              <dt>Reduced motion</dt>
+              <dd>Native scroll, no parallax.</dd>
+            </dl>
+          </article>
+          <article class="card tile" data-reveal data-spot style="--i:3">
+            <div class="demo">
+              <div class="spin-demo" aria-hidden="true"></div>
+            </div>
+            <h3>Loading</h3>
+            <p>A barrier of bars sweeps away on first load, echoing the page's theme. Form submission shows a spinner.
+            </p>
+            <dl>
+              <dt>Purpose</dt>
+              <dd>Signals readiness.</dd>
+              <dt>Reduced motion</dt>
+              <dd>Skipped entirely.</dd>
+            </dl>
+          </article>
+          <article class="card tile" data-reveal data-spot style="--i:4">
+            <div class="demo"><button type="button" class="chip check-demo" id="checkDemo" aria-pressed="false"><span
+                  class="tick" aria-hidden="true">✓</span>&nbsp;Toggle me</button></div>
+            <h3>Micro-interactions</h3>
+            <p>Buttons compress on press, toggles confirm their state with a small pop, errors nudge sideways once.</p>
+            <dl>
+              <dt>Purpose</dt>
+              <dd>Immediate feedback.</dd>
+              <dt>Reduced motion</dt>
+              <dd>State text still changes.</dd>
+            </dl>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ CONTACT FORM ============================ -->
+    <section class="section" id="contact" aria-labelledby="contact-title" data-section="contact" style="padding-top:0">
+      <div class="wrap contact">
+        <header class="section__head" style="margin:0">
+          <p class="eyebrow" data-reveal>Get the print kit</p>
+          <h2 id="contact-title" data-reveal style="--i:1">Make your own scanimation.</h2>
+          <p data-reveal style="--i:2">Leave your details and we'll send a printable plate and barrier template, with
+            the six walk frames included.</p>
+        </header>
+
+        <form class="form" id="kitForm" novalidate data-reveal style="--i:2" aria-labelledby="contact-title">
+          <div class="summary" id="summary" role="alert" tabindex="-1">
+            <h3 id="summaryTitle">Please fix the following:</h3>
+            <ul id="summaryList"></ul>
+          </div>
+          <p class="help" style="margin:0"><span class="req" aria-hidden="true">*</span> Required fields</p>
+
+          <div class="field">
+            <label for="name">Full name<span class="req" aria-hidden="true">*</span><span class="sr-only">
+                (required)</span></label>
+            <input id="name" name="name" type="text" autocomplete="name" required aria-describedby="name-err">
+            <div class="err" id="name-err"></div>
+          </div>
+          <div class="field">
+            <label for="email">Email address<span class="req" aria-hidden="true">*</span><span class="sr-only">
+                (required)</span></label>
+            <input id="email" name="email" type="email" autocomplete="email" inputmode="email" required
+              aria-describedby="email-help email-err">
+            <div class="help" id="email-help">We'll only use this to send the kit.</div>
+            <div class="err" id="email-err"></div>
+          </div>
+          <div class="field">
+            <label for="format">Paper size<span class="req" aria-hidden="true">*</span><span class="sr-only">
+                (required)</span></label>
+            <select id="format" name="format" required aria-describedby="format-err">
+              <option value="">Choose…</option>
+              <option>A4</option>
+              <option>A3</option>
+              <option>US Letter</option>
+            </select>
+            <div class="err" id="format-err"></div>
+          </div>
+          <div class="field">
+            <label for="note">Anything we should know? <span
+                style="font-weight:400;color:var(--muted)">(optional)</span></label>
+            <textarea id="note" name="note" maxlength="300" aria-describedby="note-help"></textarea>
+            <div class="help" id="note-help"><span id="noteCount">300</span> characters left</div>
+          </div>
+          <button class="btn" type="submit" id="submitBtn">Send me the kit</button>
+          <div class="status" id="status" role="status" tabindex="-1"></div>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <!-- ============================ FOOTER ============================ -->
+  <footer class="site-footer">
+    <div class="wrap">
+      <h2>Step between the <em>bars</em>.</h2>
+      <div class="foot-grid">
+        <div>
+          <p>Barrier-grid animation (scanimation) was patented in 1898 as the “kinegram” idea, and stereography has been
+            around since the 1830s. This page is a small tribute to both.</p>
+          <button class="btn" type="button" id="toTop">Back to top ↑</button>
+        </div>
+        <nav aria-label="Footer">
+          <h3>Explore</h3>
+          <ul>
+            <li><a href="#barrier">Barrier-grid</a></li>
+            <li><a href="#stereo">Stereography</a></li>
+            <li><a href="#system">Motion system</a></li>
+            <li><a href="#contact">Get the kit</a></li>
+            <li>
+              <!-- Opt-out webform link start: replace href with your webform URL -->
+              <a class="f-optout" href="https://YOUR-WEBFORM-URL-HERE" target="_blank" rel="noopener noreferrer">
+                Web Form<span class="sr-only"> (opens in a new tab)</span>
+              </a>
+              <!-- Opt-out webform link end -->
+            </li>
+          </ul>
+        </nav>
+        <div>
+          <h3>Viewing notes</h3>
+          <p>Animations pause automatically if your system asks for reduced motion. All controls work with a keyboard.
+          </p>
+        </div>
+      </div>
+    </div>
+    <div class="foot-bars" aria-hidden="true"></div>
+    <div class="wrap legal"><span>© 2026 Slit &amp; Step. Demo page.</span><span>Built to WCAG 2.2 AA.</span></div>
+  </footer>
+
+  <script defer src="https://cdn.jsdelivr.net/npm/lenis@1/dist/lenis.min.js"></script>
+  <script>
+    (() => {
+      'use strict';
+      const $ = (s, r = document) => r.querySelector(s);
+      const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+      const TAU = Math.PI * 2;
+      const mqReduce = matchMedia('(prefers-reduced-motion: reduce)');
+      let reduced = mqReduce.matches;
+
+      /* ------------------------------------------------------------------
+         Shared 3D walk-cycle skeleton (units ≈ metres, +x forward, +y up).
+         Used for both the 2D barrier-grid frames and the stereo viewer.
+      ------------------------------------------------------------------- */
+      function pose(phi) {
+        const L1 = .46, L2 = .46, UA = .30, FA = .28;
+        const legs = [0, 1].map(s => {
+          const psi = phi + s * Math.PI, z = s ? -.1 : .1;
+          const th = .55 * Math.sin(psi);
+          const flex = .08 + .95 * Math.pow(Math.max(0, Math.cos(psi)), 1.5);
+          const sh = th - flex;
+          const knee = [L1 * Math.sin(th), -L1 * Math.cos(th), z];
+          const ankle = [knee[0] + L2 * Math.sin(sh), knee[1] - L2 * Math.cos(sh), z];
+          const fo = .6 * sh;
+          const toe = [ankle[0] + .17 * Math.cos(fo), ankle[1] + .17 * Math.sin(fo), z];
+          return { hip: [0, 0, z], knee, ankle, toe, z };
+        });
+        let minY = Infinity;
+        legs.forEach(l => { minY = Math.min(minY, l.ankle[1] - .05, l.toe[1]); });
+        const off = -minY;
+        const up = p => [p[0], p[1] + off, p[2]];
+        const segs = [];
+        const add = (a, b, far) => segs.push([a, b, far]);
+        legs.forEach(l => {
+          const far = l.z < 0;
+          const [h, k, a, t] = [up(l.hip), up(l.knee), up(l.ankle), up(l.toe)];
+          add(h, k, far); add(k, a, far); add(a, t, far);
+        });
+        const pel = [0, off, 0], neck = [.04, off + .6, 0];
+        add(up(legs[0].hip), up(legs[1].hip), false);
+        add(pel, neck, false);
+        const shR = [.02, off + .55, .2], shL = [.02, off + .55, -.2];
+        add(shR, shL, false);
+        [0, 1].forEach(s => {
+          const psi = phi + (1 - s) * Math.PI, sh = s ? shL : shR;
+          const a = .45 * Math.sin(psi), fl = .3 + .4 * Math.max(0, Math.cos(psi));
+          const elbow = [sh[0] + UA * Math.sin(a), sh[1] - UA * Math.cos(a), sh[2]];
+          const wrist = [elbow[0] + FA * Math.sin(a + fl), elbow[1] - FA * Math.cos(a + fl), sh[2]];
+          add(sh, elbow, s === 1); add(elbow, wrist, s === 1);
+        });
+        const head = { c: [.06, off + .78, 0], r: .1 };
+        add(neck, [.05, off + .68, 0], false);
+        return { segs, head };
+      }
+
+      /* ------------------------------------------------------------------
+         Barrier-grid (scanimation)
+      ------------------------------------------------------------------- */
+      const N = 6, U = 3, PERIOD = N * U, SW = 600, SH = 400, K = 2;
+      const scan = $('#scan'), stage = $('#stage'), plate = $('#plate'), barrier = $('#barrier');
+      const frameCanvases = [];
+
+      function drawFrame(ctx, i, k) {
+        ctx.setTransform(k, 0, 0, k, 0, 0);
+        ctx.fillStyle = '#fbfaf6'; ctx.fillRect(0, 0, SW, SH);
+        const gY = 352, S = 185, cx = 300;
+        // ground
+        ctx.fillStyle = '#8a867c'; ctx.fillRect(0, gY, SW, 4);
+        ctx.fillStyle = '#8a867c';
+        for (let x = -60 - i * (60 / N); x < SW + 60; x += 60) ctx.fillRect(x, gY + 4, 10, 20);
+        const { segs, head } = pose(TAU * i / N);
+        ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.lineWidth = 26;
+        const P = p => [cx + p[0] * S, gY - p[1] * S];
+        [true, false].forEach(far => {
+          ctx.strokeStyle = far ? '#6b1d10' : '#c8331a';
+          ctx.beginPath();
+          segs.forEach(([a, b, f]) => { if (f === far) { const A = P(a), B = P(b); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); } });
+          ctx.stroke();
+          if (!far) { const c = P(head.c); ctx.beginPath(); ctx.arc(c[0], c[1], head.r * S, 0, TAU); ctx.stroke(); }
+        });
+      }
+
+      function buildPlate() {
+        const frames = [];
+        for (let i = 0; i < N; i++) {
+          const c = document.createElement('canvas'); c.width = SW * K; c.height = SH * K;
+          drawFrame(c.getContext('2d'), i, K); frames.push(c);
+        }
+        const ctx = plate.getContext('2d');
+        for (let col = 0; col * U < SW; col++) {
+          const f = frames[col % N];
+          ctx.drawImage(f, col * U * K, 0, U * K, SH * K, col * U * K, 0, U * K, SH * K);
+        }
+        // thumbnails
+        const strip = $('#frames');
+        frames.forEach(f => {
+          const c = document.createElement('canvas'); c.width = 150; c.height = 200;
+          c.getContext('2d').drawImage(f, 150 * K, 0, 300 * K, 400 * K, 0, 0, 150, 200);
+          strip.appendChild(c);
+        });
+        // plate peek: cropped, magnified interlaced region
+        const pk = $('#platePeek').getContext('2d');
+        pk.imageSmoothingEnabled = false;
+        pk.drawImage(plate, 200 * K, 120 * K, 300 * K, 100 * K, 0, 0, 900, 300);
+      }
+
+      function fitScan() {
+        const w = scan.clientWidth;
+        scan.style.setProperty('--s', (w / SW).toFixed(4));
+      }
+
+      let phase = 0, playing = !reduced, speed = .8, scanVisible = true;
+      const phaseIn = $('#phase'), phaseOut = $('#phaseOut'), playBtn = $('#playBtn'), speedIn = $('#speed'), speedOut = $('#speedOut');
+
+      function renderBarrier() {
+        barrier.style.transform = `translate3d(${(phase % PERIOD).toFixed(2)}px,0,0)`;
+        const frame = Math.floor((phase % PERIOD) / U) % N;
+        phaseIn.value = Math.round((phase % PERIOD) / PERIOD * 100);
+        phaseIn.setAttribute('aria-valuetext', `Frame ${frame + 1} of ${N}`);
+        phaseOut.textContent = `frame ${frame + 1} of ${N}`;
+      }
+      function setPlaying(v) {
+        playing = v; playBtn.textContent = v ? 'Pause' : 'Play';
+        playBtn.setAttribute('aria-label', v ? 'Pause walking animation' : 'Play walking animation');
+      }
+
+      phaseIn.addEventListener('input', () => { phase = phaseIn.value / 100 * PERIOD; setPlaying(false); renderBarrier(); });
+      speedIn.addEventListener('input', () => { speed = +speedIn.value; speedOut.textContent = `${speed.toFixed(1)} strides/s`; });
+      playBtn.addEventListener('click', () => setPlaying(!playing));
+      $('#barrierBtn').addEventListener('click', e => {
+        const on = scan.dataset.barrier !== 'on';
+        scan.dataset.barrier = on ? 'on' : 'off';
+        e.currentTarget.setAttribute('aria-pressed', String(on));
+      });
+      // Pointer drag (alternative: the slider above — WCAG 2.5.7)
+      let drag = null;
+      scan.addEventListener('pointerdown', e => { drag = { x: e.clientX, p: phase }; scan.setPointerCapture(e.pointerId); setPlaying(false); });
+      scan.addEventListener('pointermove', e => {
+        if (!drag) return;
+        const s = scan.clientWidth / SW;
+        phase = ((drag.p + (e.clientX - drag.x) / s) % PERIOD + PERIOD) % PERIOD; renderBarrier();
+      });
+      ['pointerup', 'pointercancel'].forEach(t => scan.addEventListener(t, () => { drag = null; }));
+
+      /* ------------------------------------------------------------------
+         Stereography
+      ------------------------------------------------------------------- */
+      const sc = $('#stereoCanvas'), sctx = sc.getContext('2d');
+      const st = { mode: 'anaglyph', sep: .4, conv: 0, yaw: 35, phi: 0, playing: !reduced, visible: false, dirty: true, w: 0, h: 0, dpr: 1 };
+      const D = 5.5;
+
+      function buildScene(phi) {
+        const { segs, head } = pose(phi), lines = [], figure = segs.map(q => [q[0], q[1]]);
+        const stride = 1.4, off = -(phi / TAU) * stride;
+        for (let z = -1.6; z <= 1.61; z += .4) lines.push([[-2.6, 0, z], [2.6, 0, z]]);
+        const lattice = (sp, n, fn) => {
+          const shift = ((off % sp) + sp) % sp;
+          for (let i = 0; i < n; i++) fn(-2.6 + (i * sp + shift) % (n * sp));
+        };
+        lattice(.35, 15, x => lines.push([[x, 0, -1.6], [x, 0, 1.6]]));
+        lattice(.7, 8, x => [-1.6, 1.6].forEach(z => lines.push([[x, 0, z], [x, .6, z]])));
+        const { c, r } = head;
+        const ring = fn => { let prev; for (let i = 0; i <= 20; i++) { const p = fn(i / 20 * TAU); if (prev) figure.push([prev, p]); prev = p; } };
+        ring(a => [c[0] + r * Math.cos(a), c[1] + r * Math.sin(a), c[2]]);
+        ring(a => [c[0] + r * Math.cos(a), c[1], c[2] + r * Math.sin(a)]);
+        ring(a => [c[0], c[1] + r * Math.cos(a), c[2] + r * Math.sin(a)]);
+        return { lines, figure };
+      }
+
+      function drawView(ctx, scene, eye, x0, w, h, colFig, colGrid) {
+        const f = Math.min(w * 1.5, h * 2.2), cx = x0 + w / 2, cy = h * .46;
+        const ya = st.yaw * Math.PI / 180, cs = Math.cos(ya), sn = Math.sin(ya);
+        const ex = eye * st.sep / 2, Dc = D + st.conv;
+        const proj = p => {
+          const x1 = p[0] * cs + p[2] * sn, z1 = -p[0] * sn + p[2] * cs, d = z1 + D;
+          if (d < .5) return null;
+          return [cx + f * (x1 - ex) / d + f * ex / Dc, cy - f * (p[1] - 1.0) / d, d];
+        };
+        ctx.save(); ctx.beginPath(); ctx.rect(x0, 0, w, h); ctx.clip();
+        ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        const stroke = (list, color, base) => {
+          ctx.strokeStyle = color;
+          list.forEach(([a, b]) => {
+            const A = proj(a), B = proj(b); if (!A || !B) return;
+            ctx.lineWidth = Math.max(.6, base * D / ((A[2] + B[2]) / 2));
+            ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke();
+          });
+        };
+        stroke(scene.lines, colGrid, 1.1 * (w / 700 + .5));
+        stroke(scene.figure, colFig, 3.2 * (w / 700 + .6));
+        ctx.restore();
+      }
+
+      function renderStereo() {
+        const w = st.w, h = st.h; if (!w) return;
+        const scene = buildScene(st.phi);
+        sctx.setTransform(st.dpr, 0, 0, st.dpr, 0, 0);
+        sctx.globalCompositeOperation = 'source-over';
+        sctx.fillStyle = '#000'; sctx.fillRect(0, 0, w, h);
+        if (st.mode === 'anaglyph') {
+          sctx.globalCompositeOperation = 'lighter';
+          drawView(sctx, scene, -1, 0, w, h, 'rgb(255,40,40)', 'rgba(255,40,40,.55)');
+          drawView(sctx, scene, 1, 0, w, h, 'rgb(0,255,255)', 'rgba(0,255,255,.55)');
+        } else if (st.mode === 'sbs') {
+          drawView(sctx, scene, -1, 0, w / 2, h, '#f2efe6', 'rgba(180,178,170,.55)');
+          drawView(sctx, scene, 1, w / 2, w / 2, h, '#f2efe6', 'rgba(180,178,170,.55)');
+          sctx.fillStyle = '#2c2c36'; sctx.fillRect(w / 2 - 1, 0, 2, h);
+        } else {
+          drawView(sctx, scene, 0, 0, w, h, '#ff8a6e', 'rgba(180,178,170,.55)');
+        }
+        st.dirty = false;
+      }
+      function fitStereo() {
+        const r = sc.getBoundingClientRect(), dpr = Math.min(devicePixelRatio || 1, 2);
+        st.w = r.width; st.h = r.height;
+        sc.width = Math.round(r.width * dpr); sc.height = Math.round(r.height * dpr);
+        st.dpr = sc.width / r.width;
+        st.dirty = true;
+      }
+
+      const modeHelp = {
+        anaglyph: ['Wear red/cyan glasses (red lens over the left eye). Without them, use “Single view”.', 'Stereoscopic red and cyan anaglyph of a wireframe figure walking on a grid.'],
+        sbs: ['Two slightly different views. Look through the screen (parallel view) until the pair merges.', 'Side-by-side stereo pair: left-eye and right-eye views of a wireframe walking figure.'],
+        mono: ['A single, flat view of the same 3D skeleton. Drag to orbit.', 'Single perspective view of a wireframe figure walking on a grid.']
+      };
+      $$('input[name=mode]').forEach(r => r.addEventListener('change', () => {
+        st.mode = r.value; $('#modeHelp').textContent = modeHelp[r.value][0];
+        sc.setAttribute('aria-label', modeHelp[r.value][1]); st.dirty = true;
+      }));
+      const bindRange = (id, key, fmt) => {
+        const el = $('#' + id), out = $('#' + id + 'Out');
+        el.addEventListener('input', () => { st[key] = +el.value; out.textContent = fmt(+el.value); st.dirty = true; });
+      };
+      bindRange('sep', 'sep', v => v.toFixed(2));
+      bindRange('conv', 'conv', v => v.toFixed(1) + ' m');
+      bindRange('yaw', 'yaw', v => v + '°');
+      const strideIn = $('#stride'), walkBtn = $('#walkBtn');
+      function setWalk(v) {
+        st.playing = v; walkBtn.textContent = v ? 'Pause walk' : 'Play walk'; walkBtn.setAttribute('aria-label', v ? 'Pause walk cycle' : 'Play walk cycle');
+      }
+      strideIn.addEventListener('input', () => { st.phi = strideIn.value / 100 * TAU; $('#strideOut').textContent = strideIn.value + '%'; setWalk(false); st.dirty = true; });
+      walkBtn.addEventListener('click', () => setWalk(!st.playing));
+      let sd = null;
+      sc.addEventListener('pointerdown', e => { sd = { x: e.clientX, y: st.yaw }; sc.setPointerCapture(e.pointerId); });
+      sc.addEventListener('pointermove', e => {
+        if (!sd) return;
+        st.yaw = Math.max(-90, Math.min(90, sd.y + (e.clientX - sd.x) * .4)); $('#yaw').value = st.yaw; $('#yawOut').textContent = Math.round(st.yaw) + '°'; st.dirty = true;
+      });
+      ['pointerup', 'pointercancel'].forEach(t => sc.addEventListener(t, () => { sd = null; }));
+
+      /* ------------------------------------------------------------------
+         Main loop — only renders what is visible and changing
+      ------------------------------------------------------------------- */
+      let last = performance.now();
+      function frame(now) {
+        const dt = Math.min(.05, (now - last) / 1000); last = now;
+        if (scanVisible && playing) { phase = (phase + speed * PERIOD * dt) % PERIOD; renderBarrier(); }
+        if (st.visible) {
+          if (st.playing) {
+            st.phi = (st.phi + dt * TAU * .8) % TAU; st.dirty = true;
+            strideIn.value = Math.round(st.phi / TAU * 100);
+          }
+          if (st.dirty) renderStereo();
+        }
+        if (lenis) lenis.raf(now);
+        requestAnimationFrame(frame);
+      }
+
+      /* ------------------------------------------------------------------
+         Nav, scrollspy, progress, parallax, reveal
+      ------------------------------------------------------------------- */
+      const header = $('#header'), nav = $('#nav'), menuBtn = $('#menuBtn');
+      function setMenu(open, focusBtn) {
+        nav.classList.toggle('open', open); menuBtn.setAttribute('aria-expanded', String(open));
+        if (!open && focusBtn) menuBtn.focus();
+      }
+      menuBtn.addEventListener('click', () => setMenu(!nav.classList.contains('open')));
+      document.addEventListener('keydown', e => { if (e.key === 'Escape' && nav.classList.contains('open')) setMenu(false, true); });
+      document.addEventListener('click', e => { if (nav.classList.contains('open') && !nav.contains(e.target) && !menuBtn.contains(e.target)) setMenu(false); });
+
+      let lenis = null;
+      function initLenis() {
+        if (window.Lenis && !reduced && !lenis) {
+          lenis = new window.Lenis({ lerp: .1, smoothWheel: true });
+          document.documentElement.classList.add('lenis');
+        }
+      }
+      function destroyLenis() { if (lenis) { lenis.destroy(); lenis = null; document.documentElement.classList.remove('lenis'); } }
+      window.addEventListener('load', initLenis);
+      mqReduce.addEventListener('change', e => {
+        reduced = e.matches;
+        if (reduced) { setPlaying(false); setWalk(false); destroyLenis(); } else initLenis();
+      });
+
+      // In-page anchors: smooth only when allowed; always move focus to the target
+      document.addEventListener('click', e => {
+        const a = e.target.closest('a[href^="#"]'); if (!a) return;
+        const id = a.getAttribute('href'); if (id.length < 2) return;
+        const t = $(id); if (!t) return;
+        e.preventDefault(); setMenu(false);
+        const y = t.getBoundingClientRect().top + scrollY - (header.offsetHeight + 8);
+        if (lenis) lenis.scrollTo(y, { duration: 1.1 }); else scrollTo({ top: y, behavior: reduced ? 'auto' : 'smooth' });
+        if (!t.hasAttribute('tabindex')) t.setAttribute('tabindex', '-1');
+        t.focus({ preventScroll: true });
+        history.replaceState(null, '', id);
+      });
+      $('#toTop').addEventListener('click', () => {
+        if (lenis) lenis.scrollTo(0, { duration: 1.2 }); else scrollTo({ top: 0, behavior: reduced ? 'auto' : 'smooth' });
+        $('#top').setAttribute('tabindex', '-1'); $('.skip').focus({ preventScroll: true });
+      });
+
+      const prog = $('#progress'), heroBg = $('#heroBg');
+      let ticking = false;
+      function onScroll() {
+        if (ticking) return; ticking = true;
+        requestAnimationFrame(() => {
+          const max = document.documentElement.scrollHeight - innerHeight;
+          prog.style.transform = `scaleX(${max > 0 ? scrollY / max : 0})`;
+          header.classList.toggle('is-stuck', scrollY > 8);
+          if (!reduced) heroBg.style.setProperty('--py', (scrollY * .18).toFixed(1) + 'px');
+          ticking = false;
+        });
+      }
+      addEventListener('scroll', onScroll, { passive: true }); onScroll();
+
+      // scrollspy → aria-current
+      const links = $$('#nav a'); const map = new Map(links.map(a => [a.getAttribute('href').slice(1), a]));
+      const spy = new IntersectionObserver(es => es.forEach(en => {
+        if (en.isIntersecting) { links.forEach(l => l.removeAttribute('aria-current')); const l = map.get(en.target.id); if (l) l.setAttribute('aria-current', 'true'); }
+      }), { rootMargin: '-45% 0px -50% 0px' });
+      ['barrier', 'stereo', 'system', 'contact'].forEach(id => spy.observe($('#' + id)));
+
+      // reveal
+      if ('IntersectionObserver' in window) {
+        const io = new IntersectionObserver(es => es.forEach(en => { if (en.isIntersecting) { en.target.classList.add('in'); io.unobserve(en.target); } }), { threshold: .12, rootMargin: '0px 0px -6% 0px' });
+        $$('[data-reveal]').forEach(el => io.observe(el));
+      } else $$('[data-reveal]').forEach(el => el.classList.add('in'));
+
+      // spotlight on cards
+      $$('[data-spot]').forEach(c => c.addEventListener('pointermove', e => {
+        const r = c.getBoundingClientRect(); c.style.setProperty('--mx', (e.clientX - r.left) + 'px'); c.style.setProperty('--my', (e.clientY - r.top) + 'px');
+      }));
+
+      // visibility gating for render loops
+      new IntersectionObserver(es => { scanVisible = es[0].isIntersecting; }, { rootMargin: '100px' }).observe(scan);
+      new IntersectionObserver(es => { st.visible = es[0].isIntersecting; if (st.visible) st.dirty = true; }, { rootMargin: '100px' }).observe(sc);
+      new ResizeObserver(fitScan).observe(scan);
+      new ResizeObserver(() => { fitStereo(); }).observe(sc);
+
+      // marquee
+      const marq = $('#marquee'), marqBtn = $('#marqBtn');
+      marqBtn.addEventListener('click', () => {
+        const p = !marq.classList.contains('paused'); marq.classList.toggle('paused', p);
+        marqBtn.textContent = p ? 'Play' : 'Pause'; marqBtn.setAttribute('aria-label', p ? 'Play scrolling ticker' : 'Pause scrolling ticker');
+      });
+      marqBtn.setAttribute('aria-label', 'Pause scrolling ticker');
+
+      // micro-interaction toggle
+      const cd = $('#checkDemo');
+      cd.addEventListener('click', () => { const on = cd.getAttribute('aria-pressed') !== 'true'; cd.setAttribute('aria-pressed', String(on)); });
+
+      // curtain
+      const curtain = $('#curtain');
+      for (let i = 0; i < 12; i++) { const b = document.createElement('i'); b.style.setProperty('--n', i); curtain.appendChild(b); }
+      curtain.lastElementChild.addEventListener('animationend', () => curtain.classList.add('done'));
+      setTimeout(() => curtain.classList.add('done'), 1800);
+
+      /* ------------------------------------------------------------------
+         Form: inline validation, error summary, status messaging
+      ------------------------------------------------------------------- */
+      const form = $('#kitForm');
+      const rules = {
+        name: v => v.trim().length < 2 ? 'Enter your full name.' : '',
+        email: v => !v.trim() ? 'Enter your email address.' : (/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim()) ? '' : 'Enter an email in the format name@example.com.'),
+        format: v => !v ? 'Choose a paper size.' : ''
+      };
+      const labelOf = id => $('label[for=' + id + ']').childNodes[0].textContent.trim();
+      function validateField(id) {
+        const el = $('#' + id), msg = rules[id](el.value), err = $('#' + id + '-err');
+        el.setAttribute('aria-invalid', msg ? 'true' : 'false');
+        err.textContent = msg; err.classList.toggle('show', !!msg);
+        return msg;
+      }
+      Object.keys(rules).forEach(id => {
+        const el = $('#' + id);
+        el.addEventListener('blur', () => { if (el.value || el.dataset.touched) validateField(id); el.dataset.touched = '1'; });
+        el.addEventListener('input', () => { if (el.getAttribute('aria-invalid') === 'true') validateField(id); });
+      });
+      const note = $('#note'); note.addEventListener('input', () => { $('#noteCount').textContent = 300 - note.value.length; });
+      form.addEventListener('submit', e => {
+        e.preventDefault();
+        const sum = $('#summary'), list = $('#summaryList'); list.innerHTML = '';
+        const errs = Object.keys(rules).map(id => [id, validateField(id)]).filter(x => x[1]);
+        $('#status').classList.remove('show');
+        if (errs.length) {
+          errs.forEach(([id, m]) => {
+            const li = document.createElement('li'); const a = document.createElement('a'); a.href = '#' + id; a.textContent = `${labelOf(id)}: ${m}`;
+            a.addEventListener('click', ev => { ev.preventDefault(); ev.stopPropagation(); $('#' + id).focus(); }); li.appendChild(a); list.appendChild(li);
+          });
+          sum.classList.add('show'); sum.focus(); return;
+        }
+        sum.classList.remove('show');
+        const btn = $('#submitBtn'); btn.classList.add('loading'); btn.setAttribute('aria-disabled', 'true'); btn.firstChild.textContent = 'Sending…';
+        setTimeout(() => { // demo only: replace with a real request
+          btn.classList.remove('loading'); btn.removeAttribute('aria-disabled'); btn.firstChild.textContent = 'Send me the kit';
+          const s = $('#status'); s.textContent = `Thanks, ${$('#name').value.trim().split(' ')[0]} — the kit is on its way to ${$('#email').value.trim()}.`;
+          s.classList.add('show'); s.focus(); form.reset(); $('#noteCount').textContent = 300;
+          Object.keys(rules).forEach(id => { $('#' + id).removeAttribute('aria-invalid'); delete $('#' + id).dataset.touched; });
+        }, 900);
+      });
+
+      /* ---- init ---- */
+      buildPlate(); fitScan(); renderBarrier(); setPlaying(playing);
+      requestAnimationFrame(t => { last = t; requestAnimationFrame(frame); });
+    })();
+  </script>
+</body>
+
+</html>
